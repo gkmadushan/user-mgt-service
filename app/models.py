@@ -1,4 +1,4 @@
-from sqlalchemy import Column, ForeignKey, SmallInteger, String, Table, text
+from sqlalchemy import Column, ForeignKey, DateTime, SmallInteger, String, Table, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -31,7 +31,7 @@ class User(Base):
     __tablename__ = 'user'
 
     id = Column(UUID, primary_key=True)
-    email = Column(String(250))
+    email = Column(String(250), unique=True)
     password = Column(String(250))
     name = Column(String(250))
     secret = Column(String(250))
@@ -47,6 +47,17 @@ class User(Base):
 
     groups = relationship('Group', secondary='user_group', backref=backref("group", lazy="dynamic"))
 
+
+class OnetimeToken(Base):
+    __tablename__ = 'onetime_token'
+
+    id = Column(UUID, primary_key=True)
+    otp = Column(String(255))
+    created_at = Column(DateTime)
+    user_id = Column(ForeignKey('user.id'), nullable=False)
+    active = Column(SmallInteger, nullable=False, server_default=text("0"))
+
+    user = relationship('User')
 
 t_user_group = Table(
     'user_group', metadata,

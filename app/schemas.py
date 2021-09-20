@@ -6,15 +6,15 @@ class UserGroup(BaseModel):
     group_id: str
 
 class CreateUser(BaseModel):
-    id: str
+    id: Optional[str]
     email: str
     name: str
     role: str
     groups: List[str] = []
 
 class ConfirmUser(BaseModel):
-    token: str
     password: str
+    otp: str
 
 class ConfigureOTP(BaseModel):
     token: str
