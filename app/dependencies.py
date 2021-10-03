@@ -1,5 +1,5 @@
 from models import User
-from fastapi import Header, HTTPException, Depends, status
+from fastapi import Header, HTTPException, Depends, status, Cookie, Request
 from database import get_db
 import hashlib
 import os
@@ -8,12 +8,13 @@ from datetime import datetime, timedelta
 from fastapi.security import OAuth2PasswordBearer
 import secrets
 import string
+from typing import Optional
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 alphabet = string.ascii_letters + string.digits
 
-async def get_token_header(Authorization: str = Header(...)):
-    user_id = validate_token(Authorization)
+async def get_token_header(access_token: Optional[str] = Cookie(default=None), request: Request = None):
+    user_id = validate_token(access_token)
     if user_id == False:
         raise HTTPException(status_code=401, detail="Authorization Bearer token invalid or expired")
     else:
@@ -43,7 +44,7 @@ def refresh_token(refresh_token,  lifetime = 5):
 
 def validate_token(token: str = Depends(oauth2_scheme)):    
     try:
-        payload = jwt.decode(token.replace('Bearer ', ''), os.getenv('JWT_SECRET'), algorithms=['HS256'])
+        payload = jwt.decode(token, os.getenv('JWT_SECRET'), algorithms=['HS256'])
         user_id: str = payload.get("sub")
     except:
         return False

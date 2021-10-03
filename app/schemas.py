@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class UserGroup(BaseModel):
@@ -9,7 +9,7 @@ class CreateUser(BaseModel):
     id: Optional[str]
     email: str
     name: str
-    role: str
+    role: str = Field(..., min=1, description="Role is required")
     groups: List[str] = []
 
 class ConfirmUser(BaseModel):

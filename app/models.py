@@ -16,7 +16,7 @@ class Group(Base):
     name = Column(String(250), nullable=False, unique=True)
     description = Column(String(6000))
 
-    users = relationship('User', secondary='user_group', backref=backref("user", lazy="dynamic"))
+    users = relationship('User', secondary='user_group', backref=backref("user"), passive_deletes='all')
 
 
 class Role(Base):
@@ -45,7 +45,7 @@ class User(Base):
     parent1 = relationship('User', remote_side=[id], primaryjoin='User.deleted_by == User.id')
     role = relationship('Role')
 
-    groups = relationship('Group', secondary='user_group', backref=backref("group", lazy="dynamic"))
+    groups = relationship('Group', secondary='user_group', backref=backref("group"), passive_deletes='all')
 
 
 class OnetimeToken(Base):

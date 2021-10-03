@@ -24,13 +24,13 @@ page_size = os.getenv('PAGE_SIZE')
 
 router = APIRouter(
     prefix="/user-service/v1",
-    tags=["UserManagementAPIs"],
+    tags=["GroupManagementAPIs"],
     # dependencies=[Depends(get_token_header)],
     responses={404: {"description": "Not found"}},
 )
 
 #@todo - Unit test, sending confirmation email
-@router.post("/users")
+@router.post("/groups")
 def create(details: CreateUser, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     #generate token
     otp = get_secret_random()
@@ -73,28 +73,23 @@ def create(details: CreateUser, commons: dict = Depends(common_params), db: Sess
     }
 
 #@todo - Unit test
-@router.get("/users")
-def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None, role: Optional[str] = None):
+@router.get("/groups")
+def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None):
     filters = {}
 
     if(id):
         filters['id'] = id
     if(group):
-        filters['id'] = group
-    if(role):
-        filters['role_id'] = role
+        filters['name'] = group
 
     query = db.query(
-        over(func.row_number(), order_by='email').label('index'),
-        User.id,
-        User.email,
-        Role.name.label('role'),
-        User.name,
-        User.active,
-        # User.created_at.label('registered_at'),
+        over(func.row_number(), order_by='name').label('index'),
+        Group.id,        
+        Group.name,
+        Group.description
     )
 
-    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(User.role).filter_by(**filters).order_by(User.email.asc()), page_number = int(page), page_size = int(limit))
+    query, pagination = apply_pagination(query.filter_by(**filters), page_number = int(page), page_size = int(limit))
 
     response = {
         "data": query.all(),
@@ -109,7 +104,7 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
     return response
 
 #@todo - Unit test
-@router.delete("/users/{id}")
+@router.delete("/groups/{id}")
 def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     user = db.query(User).get(id.strip())
     db.delete(user)
@@ -117,13 +112,3 @@ def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = 
     return Response(status_code=204)
 
 
-@router.get("/users/{id}/generate-secret/{confirmation}")
-def generate_qr(db: Session = Depends(get_db), token = Depends(get_token_header)):
-    user = db.query(User).get(token)
-    user_secret = user.secret
-    qr = qrcode.make("otpauth://totp/SecOps:OTP?secret={}&issuer=SecOpsRobot".format(user_secret))
-    buffer = BytesIO()
-    qr.save(buffer, format="PNG")
-    image = base64.b64encode(buffer.getvalue()).decode()
-    
-    return image
