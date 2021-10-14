@@ -29,6 +29,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+
 #@todo - Unit test
 @router.get("/roles")
 def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None):

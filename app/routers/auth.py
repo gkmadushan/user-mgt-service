@@ -56,7 +56,8 @@ def confirm(id: str, token, db: Session = Depends(get_db)):
     try:
         valid_token_count = db.query(OnetimeToken).filter_by(**filters).count()
         if valid_token_count >= 0:
-            user = db.query(User).get(id)                   
+            user = db.query(User).get(id)      
+            
             qr = qrcode.make("otpauth://totp/SecOps:OTP?secret={}&issuer=SecOpsRobot".format(user.secret))
             buffer = BytesIO()
             qr.save(buffer, format="PNG")
@@ -84,7 +85,7 @@ def confirm(id: str, token, details: ConfirmUser,  db: Session = Depends(get_db)
                 db.commit()
                 return {"user_id":user.id}
             else:
-                raise HTTPException(status_code=400, detail="Invalid User ID or Token")
+                raise HTTPException(status_code=500, detail="Invalid OTP"+pyotp.TOTP(user.secret).now())
     except:
-        raise HTTPException(status_code=400, detail="Invalid User ID or Token")
+        raise HTTPException(status_code=500, detail="Invalid OTP"+pyotp.TOTP(user.secret).now())
     

@@ -3,8 +3,8 @@ from sqlalchemy.exc import IntegrityError
 from starlette.responses import Response
 from models import OnetimeToken
 from fastapi import APIRouter, Depends, HTTPException, Request
-from dependencies import common_params, get_db, get_secret_random
-from schemas import CreateUser
+from dependencies import common_params, get_db, get_secret_random, send_email
+from schemas import CreateUser, UpdateUser
 from sqlalchemy.orm import Session
 from typing import Optional
 from models import User, Group, Role
@@ -13,14 +13,16 @@ import uuid
 from datetime import datetime
 from exceptions import username_already_exists
 from sqlalchemy import over
-from sqlalchemy import engine_from_config, and_, func
+from sqlalchemy import engine_from_config, and_, func, case
 from sqlalchemy_filters import apply_pagination
 import time
 import os
 import uuid
+import base64
+import pyotp
 
 page_size = os.getenv('PAGE_SIZE')
-
+BASE_URL = os.getenv('BASE_URL')
 
 router = APIRouter(
     prefix="/user-service/v1",
@@ -41,7 +43,7 @@ def create(details: CreateUser, commons: dict = Depends(common_params), db: Sess
         email=details.email,
         name=details.name,
         role_id=details.role,        
-        secret=get_secret_random(10)
+        secret=pyotp.random_base32()
     )
 
     #Set user groups
@@ -67,22 +69,45 @@ def create(details: CreateUser, commons: dict = Depends(common_params), db: Sess
     except IntegrityError as err:
         db.rollback()
         raise HTTPException(status_code=422, detail=username_already_exists)
+
+    #Sending the confirmation link
+    recipient = details.email
+    #Test address
+    recipient = 'gkmadushan@gmail.com'
+    msg = """
+    Hi\n
+    Please confirm you email by navigating your browser to below URL\n
+    {}/users/confirm?user={}&token={}\n
+    Thank you\n
+    SecOps
+    """.format(BASE_URL, user_id, otp)
+
+    html = """
+    Hi<br/>
+    Please confirm you email by navigating your browser to below URL<br/>
+    <a href="{}/users/confirm?user={}&token={}">Confirm</a><br/>
+    Thank you<br/>
+    SecOps
+    """.format(BASE_URL, user_id, otp)
+    send_email(recipient, 'SecOps - Registration Confirmation Email', msg=msg, html=html)
+
     return {
         "success": True,
-        "tokenTMPShow":otp
     }
 
 #@todo - Unit test
 @router.get("/users")
-def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None, role: Optional[str] = None):
-    filters = {}
+def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None, role: Optional[str] = None, email: Optional[str] = None):
+    filters = []
 
-    if(id):
-        filters['id'] = id
-    if(group):
-        filters['id'] = group
     if(role):
-        filters['role_id'] = role
+        filters.append(User.role_id == role)
+
+    if(group):
+        filters.append(Group.id == group)
+
+    if(email):
+        filters.append(User.email.ilike(email+'%'))
 
     query = db.query(
         over(func.row_number(), order_by='email').label('index'),
@@ -90,11 +115,11 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
         User.email,
         Role.name.label('role'),
         User.name,
-        User.active,
-        # User.created_at.label('registered_at'),
+        case((User.active == 1, 'Yes'), (User.active == 0, 'No')).label('active'),
+        func.to_char(User.created_at, 'DD/MM/YYYY HH12:MI PM').label('created_at'),
     )
 
-    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(User.role).filter_by(**filters).order_by(User.email.asc()), page_number = int(page), page_size = int(limit))
+    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(User.role).where(and_(*filters)).order_by(User.email.asc()), page_number = int(page), page_size = int(limit))
 
     response = {
         "data": query.all(),
@@ -115,6 +140,38 @@ def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = 
     db.delete(user)
     db.commit()
     return Response(status_code=204)
+    
+#@todo - Unit test
+@router.get("/test")
+# def test():
+#     msg = """
+#     Hi\n
+#     Please confirm you email by navigating your browser to below URL\n
+#     http://localhost:3000/confirm\n
+#     Thank you\n
+#     SecOps
+#     """
+
+#     html = """
+#     Hi<br/>
+#     Please confirm you email by navigating your browser to below URL<br/>
+#     <a href="http://localhost:3000/confirm">Confirm</a><br/>
+#     Thank you<br/>
+#     SecOps
+#     """
+#     return send_email('gkmadushan@gmail.com', 'SecOps - Registration Confirmation Email', msg=msg, html=html)
+
+#get user by id
+@router.get("/users/{id}")
+def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+    user = db.query(User).get(id.strip())
+    if user == None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    user.groups = user.groups
+    response = {
+        "data": user
+    }
+    return response
 
 
 @router.get("/users/{id}/generate-secret/{confirmation}")
@@ -127,3 +184,33 @@ def generate_qr(db: Session = Depends(get_db), token = Depends(get_token_header)
     image = base64.b64encode(buffer.getvalue()).decode()
     
     return image
+
+
+@router.put("/users/{id}")
+def update(id:str, details: UpdateUser, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+    #Set user entity
+    user = db.query(User).get(id)
+
+    user.name = details.name
+    if user.role_id != details.role:
+        user.role_id = details.role
+
+    #Set user groups
+    if user.groups != []:
+        user.groups = []
+
+    if details.groups != []:
+        for group in details.groups:
+            group_entity = db.query(Group).get(group)
+            user.groups.append(group_entity)
+
+    #commiting data to db
+    try:
+        db.add(user)
+        db.commit()
+    except IntegrityError as err:
+        db.rollback()
+        raise HTTPException(status_code=422, detail=username_already_exists)
+    return {
+        "success": True
+    }

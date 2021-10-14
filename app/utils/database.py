@@ -12,7 +12,7 @@ SQLALCHEMY_DB_URL = "postgresql://%s:%s@db/user" % (DB_USERNAME, DB_PASSWORD)
 config = {'db.url':SQLALCHEMY_DB_URL, 'db.echo':'True'}
 
 # engine = create_engine(SQLALCHEMY_DB_URL)
-engine = engine_from_config(config, prefix='db.')
+engine = engine_from_config(config, prefix='db.', pool_size=50, max_overflow=0)
 engine.dialect.supports_sane_rowcount = engine.dialect.supports_sane_multi_rowcount = False
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

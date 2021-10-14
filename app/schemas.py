@@ -12,6 +12,11 @@ class CreateUser(BaseModel):
     role: str = Field(..., min=1, description="Role is required")
     groups: List[str] = []
 
+class UpdateUser(BaseModel):
+    name: str
+    role: str = Field(..., min=1, description="Role is required")
+    groups: List[str] = []
+
 class ConfirmUser(BaseModel):
     password: str
     otp: str

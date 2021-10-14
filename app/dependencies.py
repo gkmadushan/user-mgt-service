@@ -1,6 +1,7 @@
 from models import User
 from fastapi import Header, HTTPException, Depends, status, Cookie, Request
-from database import get_db
+from utils.database import get_db
+from utils.email import send_email
 import hashlib
 import os
 import jwt
@@ -56,3 +57,6 @@ def get_secret_random(size=100):
 
 async def common_params():
     return {}
+
+async def send_email_handler():
+    send_email()
