@@ -141,25 +141,6 @@ def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = 
     db.commit()
     return Response(status_code=204)
     
-#@todo - Unit test
-@router.get("/test")
-# def test():
-#     msg = """
-#     Hi\n
-#     Please confirm you email by navigating your browser to below URL\n
-#     http://localhost:3000/confirm\n
-#     Thank you\n
-#     SecOps
-#     """
-
-#     html = """
-#     Hi<br/>
-#     Please confirm you email by navigating your browser to below URL<br/>
-#     <a href="http://localhost:3000/confirm">Confirm</a><br/>
-#     Thank you<br/>
-#     SecOps
-#     """
-#     return send_email('gkmadushan@gmail.com', 'SecOps - Registration Confirmation Email', msg=msg, html=html)
 
 #get user by id
 @router.get("/users/{id}")
@@ -174,16 +155,16 @@ def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Dep
     return response
 
 
-@router.get("/users/{id}/generate-secret/{confirmation}")
-def generate_qr(db: Session = Depends(get_db), token = Depends(get_token_header)):
-    user = db.query(User).get(token)
-    user_secret = user.secret
-    qr = qrcode.make("otpauth://totp/SecOps:OTP?secret={}&issuer=SecOpsRobot".format(user_secret))
-    buffer = BytesIO()
-    qr.save(buffer, format="PNG")
-    image = base64.b64encode(buffer.getvalue()).decode()
+# @router.get("/users/{id}/generate-secret/{confirmation}")
+# def generate_qr(db: Session = Depends(get_db), token = Depends(get_token_header)):
+#     user = db.query(User).get(token)
+#     user_secret = user.secret
+#     qr = qrcode.make("otpauth://totp/SecOps:OTP?secret={}&issuer=SecOpsRobot".format(user_secret))
+#     buffer = BytesIO()
+#     qr.save(buffer, format="PNG")
+#     image = base64.b64encode(buffer.getvalue()).decode()
     
-    return image
+#     return image
 
 
 @router.put("/users/{id}")
@@ -213,4 +194,52 @@ def update(id:str, details: UpdateUser, commons: dict = Depends(common_params), 
         raise HTTPException(status_code=422, detail=username_already_exists)
     return {
         "success": True
+    }
+
+#@todo - Unit test, sending confirmation email
+@router.post("/users/{id}/reset-password")
+def send_recovery_email(id:str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+    user = db.query(User).get(id)
+    otp = get_secret_random()
+
+    #Set token entity
+    token = OnetimeToken(
+        id=uuid.uuid4().hex,
+        otp=otp,
+        created_at=datetime.now(),
+        user_id=id,
+        active=1
+    )    
+
+    #commiting data to db
+    try:
+        db.add(token)
+        db.commit()
+    except IntegrityError as err:
+        db.rollback()
+        raise HTTPException(status_code=422, detail="Unable to store token")
+
+    #Sending the confirmation link
+    recipient = user.email
+    #Test address
+    recipient = 'gkmadushan@gmail.com'
+    msg = """
+    Hi\n
+    Please click the below link to reset the password\n
+    {}/users/confirm?user={}&token={}\n
+    Thank you\n
+    SecOps
+    """.format(BASE_URL, id, otp)
+
+    html = """
+    Hi<br/>
+    Please click the below link to reset the password<br/>
+    <a href="{}/users/confirm?user={}&token={}">Confirm</a><br/>
+    Thank you<br/>
+    SecOps
+    """.format(BASE_URL, id, otp)
+    send_email(recipient, 'SecOps - Password Recovery', msg=msg, html=html)
+
+    return {
+        "success": True,
     }

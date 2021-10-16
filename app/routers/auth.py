@@ -55,7 +55,7 @@ def confirm(id: str, token, db: Session = Depends(get_db)):
     filters['active'] = 1
     try:
         valid_token_count = db.query(OnetimeToken).filter_by(**filters).count()
-        if valid_token_count >= 0:
+        if valid_token_count > 0:
             user = db.query(User).get(id)      
             
             qr = qrcode.make("otpauth://totp/SecOps:OTP?secret={}&issuer=SecOpsRobot".format(user.secret))
@@ -63,8 +63,10 @@ def confirm(id: str, token, db: Session = Depends(get_db)):
             qr.save(buffer, format="PNG")
             image = base64.b64encode(buffer.getvalue()).decode()
             return image
+        else:
+            raise HTTPException(status_code=500, detail="Invalid User ID or Token") 
     except:
-        raise HTTPException(status_code=400, detail="Invalid User ID or Token")
+        raise HTTPException(status_code=500, detail="Invalid User ID or Token")
     
 
 @router.patch("/users/{id}/verify/{token}")
@@ -82,6 +84,8 @@ def confirm(id: str, token, details: ConfirmUser,  db: Session = Depends(get_db)
                 user.active = 1
                 user.password = hash(details.password)
                 active_token.active = 0
+                # db.add(user)
+                # db.add(active_token)
                 db.commit()
                 return {"user_id":user.id}
             else:

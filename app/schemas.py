@@ -29,3 +29,11 @@ class AuthDetails(BaseModel):
     username: str
     password: str
 
+class CreateGroup(BaseModel):
+    id: Optional[str]
+    name: str
+    description: str
+
+class UpdateGroup(BaseModel):
+    name: str
+    description: str
