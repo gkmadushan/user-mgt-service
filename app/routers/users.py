@@ -25,7 +25,7 @@ page_size = os.getenv('PAGE_SIZE')
 BASE_URL = os.getenv('BASE_URL')
 
 router = APIRouter(
-    prefix="/user-service/v1",
+    prefix="/v1",
     tags=["UserManagementAPIs"],
     # dependencies=[Depends(get_token_header)],
     responses={404: {"description": "Not found"}},

@@ -23,7 +23,7 @@ page_size = os.getenv('PAGE_SIZE')
 
 
 router = APIRouter(
-    prefix="/user-service/v1",
+    prefix="/v1",
     tags=["GroupManagementAPIs"],
     # dependencies=[Depends(get_token_header)],
     responses={404: {"description": "Not found"}},
