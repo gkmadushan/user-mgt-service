@@ -35,7 +35,7 @@ async def login(username = Form(...), password = Form(...), otp : Optional[str] 
 
     response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=True)
     response.set_cookie(key="access_token", value=access_token, httponly=True, secure=True)
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "refresh_token":refresh_token, "token_type": "bearer", "name":user.name, "role":user.role.code, "groups":user.groups}
 
 @router.post("/oauth/refresh-token")
 async def refresh_token(refresh_token: Optional[str] = Cookie(None), db: Session = Depends(get_db), response: Response = None):
@@ -84,12 +84,12 @@ def confirm(id: str, token, details: ConfirmUser,  db: Session = Depends(get_db)
                 user.active = 1
                 user.password = hash(details.password)
                 active_token.active = 0
-                # db.add(user)
-                # db.add(active_token)
+                db.add(user)
+                db.add(active_token)
                 db.commit()
                 return {"user_id":user.id}
             else:
-                raise HTTPException(status_code=500, detail="Invalid OTP"+pyotp.TOTP(user.secret).now())
+                raise HTTPException(status_code=500, detail="Invalid OTP "+pyotp.TOTP(user.secret).now())
     except:
-        raise HTTPException(status_code=500, detail="Invalid OTP"+pyotp.TOTP(user.secret).now())
+        raise HTTPException(status_code=500, detail="Invalid OTP "+pyotp.TOTP(user.secret).now())
     
