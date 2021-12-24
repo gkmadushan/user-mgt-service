@@ -31,37 +31,39 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-#@todo - Unit test, sending confirmation email
+# @todo - Unit test, sending confirmation email
+
+
 @router.post("/users")
 def create(details: CreateUser, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
-    #generate token
+    # generate token
     otp = get_secret_random()
     user_id = details.id or uuid.uuid4().hex
-    #Set user entity
+    # Set user entity
     user = User(
         id=user_id,
         email=details.email,
         name=details.name,
-        role_id=details.role,        
+        role_id=details.role,
         secret=pyotp.random_base32()
     )
 
-    #Set user groups
+    # Set user groups
     if details.groups != []:
         for group in details.groups:
             group_entity = db.query(Group).get(group)
             user.groups.append(group_entity)
 
-    #Set token entity
+    # Set token entity
     token = OnetimeToken(
         id=uuid.uuid4().hex,
         otp=otp,
         created_at=datetime.now(),
         user_id=user_id,
         active=1
-    )    
+    )
 
-    #commiting data to db
+    # commiting data to db
     try:
         db.add(user)
         db.add(token)
@@ -70,9 +72,9 @@ def create(details: CreateUser, commons: dict = Depends(common_params), db: Sess
         db.rollback()
         raise HTTPException(status_code=422, detail=username_already_exists)
 
-    #Sending the confirmation link
+    # Sending the confirmation link
     recipient = details.email
-    #Test address
+    # Test address
     recipient = 'gkmadushan@gmail.com'
     msg = """
     Hi\n
@@ -95,9 +97,11 @@ def create(details: CreateUser, commons: dict = Depends(common_params), db: Sess
         "success": True,
     }
 
-#@todo - Unit test
+# @todo - Unit test
+
+
 @router.get("/users")
-def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None, role: Optional[str] = None, email: Optional[str] = None):
+def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None, role: Optional[str] = None, email: Optional[str] = None, role_code: Optional[str] = None):
     filters = []
 
     if(role):
@@ -105,6 +109,9 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
 
     if(group):
         filters.append(Group.id == group)
+
+    if(role_code):
+        filters.append(Role.code == role_code)
 
     if(email):
         filters.append(User.email.ilike(email+'%'))
@@ -119,11 +126,12 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
         func.to_char(User.created_at, 'DD/MM/YYYY HH12:MI PM').label('created_at'),
     )
 
-    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(User.role).where(and_(*filters)).order_by(User.email.asc()), page_number = int(page), page_size = int(limit))
+    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(
+        User.role).where(and_(*filters)).order_by(User.email.asc()), page_number=int(page), page_size=int(limit))
 
     response = {
         "data": query.all(),
-        "meta":{
+        "meta": {
             "total_records": pagination.total_results,
             "limit": pagination.page_size,
             "num_pages": pagination.num_pages,
@@ -133,16 +141,18 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
 
     return response
 
-#@todo - Unit test
+# @todo - Unit test
+
+
 @router.delete("/users/{id}")
 def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     user = db.query(User).get(id.strip())
     db.delete(user)
     db.commit()
     return Response(status_code=204)
-    
 
-#get user by id
+
+# get user by id
 @router.get("/users/{id}")
 def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     user = db.query(User).get(id.strip())
@@ -163,20 +173,20 @@ def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Dep
 #     buffer = BytesIO()
 #     qr.save(buffer, format="PNG")
 #     image = base64.b64encode(buffer.getvalue()).decode()
-    
+
 #     return image
 
 
 @router.put("/users/{id}")
-def update(id:str, details: UpdateUser, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
-    #Set user entity
+def update(id: str, details: UpdateUser, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+    # Set user entity
     user = db.query(User).get(id)
 
     user.name = details.name
     if user.role_id != details.role:
         user.role_id = details.role
 
-    #Set user groups
+    # Set user groups
     if user.groups != []:
         user.groups = []
 
@@ -185,7 +195,7 @@ def update(id:str, details: UpdateUser, commons: dict = Depends(common_params), 
             group_entity = db.query(Group).get(group)
             user.groups.append(group_entity)
 
-    #commiting data to db
+    # commiting data to db
     try:
         db.add(user)
         db.commit()
@@ -196,22 +206,24 @@ def update(id:str, details: UpdateUser, commons: dict = Depends(common_params), 
         "success": True
     }
 
-#@todo - Unit test, sending confirmation email
+# @todo - Unit test, sending confirmation email
+
+
 @router.post("/users/{id}/reset-password")
-def send_recovery_email(id:str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+def send_recovery_email(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     user = db.query(User).get(id)
     otp = get_secret_random()
 
-    #Set token entity
+    # Set token entity
     token = OnetimeToken(
         id=uuid.uuid4().hex,
         otp=otp,
         created_at=datetime.now(),
         user_id=id,
         active=1
-    )    
+    )
 
-    #commiting data to db
+    # commiting data to db
     try:
         db.add(token)
         db.commit()
@@ -219,9 +231,9 @@ def send_recovery_email(id:str, commons: dict = Depends(common_params), db: Sess
         db.rollback()
         raise HTTPException(status_code=422, detail="Unable to store token")
 
-    #Sending the confirmation link
+    # Sending the confirmation link
     recipient = user.email
-    #Test address
+    # Test address
     recipient = 'gkmadushan@gmail.com'
     msg = """
     Hi\n
