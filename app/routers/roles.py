@@ -30,7 +30,7 @@ router = APIRouter(
 )
 
 
-#@todo - Unit test
+# @todo - Unit test
 @router.get("/roles")
 def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None):
     filters = {}
@@ -42,16 +42,16 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
 
     query = db.query(
         over(func.row_number(), order_by='name').label('index'),
-        Role.id,        
+        Role.id,
         Role.name,
         Role.code
     )
 
-    query, pagination = apply_pagination(query.filter_by(**filters), page_number = int(page), page_size = int(limit))
+    query, pagination = apply_pagination(query.filter_by(**filters), page_number=int(page), page_size=int(limit))
 
     response = {
         "data": query.all(),
-        "meta":{
+        "meta": {
             "total_records": pagination.total_results,
             "limit": pagination.page_size,
             "num_pages": pagination.num_pages,
@@ -60,4 +60,3 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
     }
 
     return response
-

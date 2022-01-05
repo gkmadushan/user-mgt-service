@@ -22,7 +22,7 @@ import base64
 import pyotp
 
 page_size = os.getenv('PAGE_SIZE')
-BASE_URL = os.getenv('BASE_URL')
+BASE_URL = "http://localhost:8089"
 
 router = APIRouter(
     prefix="/v1",
@@ -115,9 +115,11 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
 
     if(email):
         filters.append(User.email.ilike(email+'%'))
+    else:
+        filters.append(User.email.ilike('%'))
 
     query = db.query(
-        over(func.row_number(), order_by='email').label('index'),
+        over(func.dense_rank(), order_by="email").label('index'),
         User.id,
         User.email,
         Role.name.label('role'),
@@ -126,7 +128,7 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
         func.to_char(User.created_at, 'DD/MM/YYYY HH12:MI PM').label('created_at'),
     )
 
-    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups, isouter=True).join(
+    query, pagination = apply_pagination(query.distinct(User.email).join(User.groups).join(
         User.role).where(and_(*filters)).order_by(User.email.asc()), page_number=int(page), page_size=int(limit))
 
     response = {

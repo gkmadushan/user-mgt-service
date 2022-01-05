@@ -29,19 +29,19 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-#@todo - Unit test, sending confirmation email
+
 @router.post("/groups")
 def create(details: CreateGroup, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
-    #generate token
+    # generate token
     id = details.id or uuid.uuid4().hex
-    #Set user entity
+    # Set user entity
     group = Group(
         id=id,
         name=details.name,
         description=details.description
-    )    
+    )
 
-    #commiting data to db
+    # commiting data to db
     try:
         db.add(group)
         db.commit()
@@ -52,15 +52,18 @@ def create(details: CreateGroup, commons: dict = Depends(common_params), db: Ses
         "success": True
     }
 
-#@todo - Unit test
+
 @router.get("/groups")
 def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, commons: dict = Depends(common_params), db: Session = Depends(get_db), id: Optional[str] = None, group: Optional[str] = None):
     filters = []
 
     if(group):
         filters.append(Group.name.ilike(group+'%'))
+    else:
+        filters.append(Group.name.ilike('%'))
 
-    count_users_stmt = literal_column('(SELECT count(*) FROM user_group ug WHERE ug.group_id = "group".id)').label('num_users')
+    count_users_stmt = literal_column(
+        '(SELECT count(*) FROM user_group ug WHERE ug.group_id = "group".id)').label('num_users')
 
     query = db.query(
         over(func.row_number(), order_by='name').label('index'),
@@ -70,11 +73,12 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
         Group.description
     )
 
-    query, pagination = apply_pagination(query.where(and_(*filters)).order_by(Group.name.asc()), page_number = int(page), page_size = int(limit))
+    query, pagination = apply_pagination(query.where(
+        and_(*filters)).order_by(Group.name.asc()), page_number=int(page), page_size=int(limit))
 
     response = {
         "data": query.all(),
-        "meta":{
+        "meta": {
             "total_records": pagination.total_results,
             "limit": pagination.page_size,
             "num_pages": pagination.num_pages,
@@ -84,7 +88,7 @@ def get_by_filter(page: Optional[str] = 1, limit: Optional[int] = page_size, com
 
     return response
 
-#@todo - Unit test
+
 @router.delete("/groups/{id}")
 def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     group = db.query(Group).get(id.strip())
@@ -93,7 +97,7 @@ def delete_by_id(id: str, commons: dict = Depends(common_params), db: Session = 
     return Response(status_code=204)
 
 
-#get user by id
+# get user by id
 @router.get("/groups/{id}")
 def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
     group = db.query(Group).get(id.strip())
@@ -104,15 +108,16 @@ def get_by_id(id: str, commons: dict = Depends(common_params), db: Session = Dep
     }
     return response
 
+
 @router.put("/groups/{id}")
-def update(id:str, details: UpdateGroup, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
-    #Set user entity
+def update(id: str, details: UpdateGroup, commons: dict = Depends(common_params), db: Session = Depends(get_db)):
+    # Set user entity
     group = db.query(Group).get(id)
 
     group.name = details.name
     group.description = details.description
 
-    #commiting data to db
+    # commiting data to db
     try:
         db.add(group)
         db.commit()
