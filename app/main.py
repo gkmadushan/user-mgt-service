@@ -4,7 +4,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import users, auth, groups, roles
 from fastapi.security import OAuth2PasswordBearer
 
+from fastapi_route_logger_middleware import RouteLoggerMiddleware
+import logging
+from datetime import date
+
+logging.basicConfig(filename='../logs/{}_app.log'.format(date.today().strftime("%Y-%m-%d")), level=logging.INFO)
 app = FastAPI(debug=True)
+app.add_middleware(RouteLoggerMiddleware)
 
 origins = [
     "http://localhost",
@@ -12,7 +18,7 @@ origins = [
     "http://localhost:3000",
 ]
 
-#middlewares
+# middlewares
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -21,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-#user routes
+# user routes
 app.include_router(users.router)
 app.include_router(auth.router)
 app.include_router(groups.router)
